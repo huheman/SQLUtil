@@ -23,9 +23,9 @@ public final class SQLUtil {
     private static final String LIMIT = "limit";
     private static final String OFFSET = "offset";
 
-    private static final String KEY_SEPARTOR = ":";
+    static final String KEY_SEPARTOR = ":";
 
-    private static final List<String> ORDERS = List.of(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
+    static final List<String> ORDERS = List.of(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
             GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, ORDER, LIMIT, OFFSET);
     private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET); // 可以冒号后面不接其他的命令
 
@@ -67,7 +67,7 @@ public final class SQLUtil {
     /**
      * 能够把map中符合格式的键值对转化为可用的sql语句
      */
-    public static String createConditionSQL(Map<String, Object> condition) {
+    public static String createConditionSQL(ConditionMap condition) {
         return condition.entrySet().stream().map(new Function<Map.Entry<String, Object>, String>() {
             boolean needWhere = true;
 
@@ -177,7 +177,7 @@ public final class SQLUtil {
      *
      * 此方法等同于新建一个ConditionMap，把符合规则的entry放进去。
      */
-    public static ConditionMap filterConditionOnly(Map<String, String> map) {
+    public static ConditionMap makeConditionMap(Map<String, String> map) {
         return SQLUtil.filterCondition(map, ORDERS, true);
     }
 
@@ -253,35 +253,5 @@ public final class SQLUtil {
                 }).toArray();
     }
 
-    public static class ConditionMap extends TreeMap<String, Object> {
-        // 命令的排序方式
-        private static Comparator<String> sqlComparator = (o1, o2) -> {
-            if (o1.contains(KEY_SEPARTOR) && o2.contains(KEY_SEPARTOR)) {
-                String sub_1 = o1.substring(0, o1.indexOf(KEY_SEPARTOR));
-                String sub_2 = o2.substring(0, o2.indexOf(KEY_SEPARTOR));
-                int i1 = -1;
-                int i2 = -1;
-                for (int i = 0; i < ORDERS.size(); i++) {
-                    if (sub_1.matches(ORDERS.get(i))) i1 = i;
-                    if (sub_2.matches(ORDERS.get(i))) i2 = i;
-                }
-                if (i1 == i2) return o1.compareTo(o2);
-                return i1 - i2;
-            }
-            return 1;
-        };
 
-        private ConditionMap() {
-            super(sqlComparator);
-        }
-
-        @Override
-        public Object put(String key, Object value) {
-            // value既不允许为空，也不允许为空字符串
-            if (value == null || value.equals("")) {
-                return null;
-            }
-            return super.put(key, value);
-        }
-    }
 }

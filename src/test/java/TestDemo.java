@@ -1,15 +1,14 @@
 import org.junit.Test;
+import utils.ConditionMap;
 import utils.SQLUtil;
 
 import java.util.Arrays;
-import java.util.Map;
-import java.util.TreeMap;
 
 public class TestDemo {
     @Test
     public void testSQL() {
         long l = System.currentTimeMillis();
-        TreeMap<String, Object> conditionMap = SQLUtil.createConditionMap();
+        ConditionMap conditionMap = SQLUtil.createConditionMap();
         conditionMap.put(":id", 2);
         conditionMap.put("gt:price", 3);
         conditionMap.put("like:product", "烟草");
@@ -21,7 +20,7 @@ public class TestDemo {
         Object[] conditionValues = SQLUtil.createConditionValues(conditionMap);
         System.out.println("conditionSQL = " + conditionSQL);
         System.out.println("conditionValues = " + Arrays.toString(conditionValues));
-        Map<String, Object> countMap = SQLUtil.filterConditionForCount(conditionMap);
+        ConditionMap countMap = SQLUtil.filterConditionForCount(conditionMap);
         String countSQL = "select count(*) from tab_product" + SQLUtil.createConditionSQL(countMap);
         System.out.println("countSQL = " + countSQL);
         Object[] countValues = SQLUtil.createConditionValues(countMap);
