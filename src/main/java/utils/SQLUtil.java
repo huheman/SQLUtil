@@ -26,7 +26,7 @@ public final class SQLUtil {
     private static final String KEY_SEPARTOR = ":";
 
     private static final List<String> ORDERS = List.of(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
-            GREATER_EQUAL, LESS_EQUAL, LIKE, IN, ORDER, LIMIT, OFFSET);
+            GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, ORDER, LIMIT, OFFSET);
     private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET);
     private static Comparator<String> sqlComparator = (o1, o2) -> {
         if (o1.contains(KEY_SEPARTOR) && o2.contains(KEY_SEPARTOR)) {
@@ -62,7 +62,6 @@ public final class SQLUtil {
      * 因为用NamedTemplate非常严格，要求sql中的别名要完全符合，包括大小写和必须在map中有指定，
      * 所以我们把大小写和在map中没出现的别名，全部替换成null，来解决这个问题
      * 此方法适合insert into。
-     *
      */
     public static String formatSQL(String sql, Map<String, String> map) {
         Pattern pattern = Pattern.compile(":(\\w+)[,)]");
@@ -158,18 +157,6 @@ public final class SQLUtil {
                         }
                         sb.setCharAt(sb.length() - 1, ')');
                         break;
-                            /*Matcher matcher = Pattern.compile("(^|,)(\\d+?)").matcher((String) entry.getValue());
-
-                            boolean result = matcher.find();
-                            if (result) {
-                                StringBuilder sbForIn = new StringBuilder();
-                                do {
-                                    matcher.appendReplacement(sbForIn, matcher.group().replace(matcher.group(2), value));
-                                    result = matcher.find();
-                                } while (result);
-                                matcher.appendTail(sbForIn);
-                                sb.append(sbForIn);
-                            }*/
                     default:
                         if (split[0].startsWith("JOIN")) {
                             // 通过正则表达式，找到对应的ON键

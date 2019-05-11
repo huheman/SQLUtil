@@ -15,6 +15,7 @@ public class TestDemo {
         conditionMap.put("like:product", "烟草");
         conditionMap.put("limit:", 5);
         conditionMap.put("offset:", 10);
+        conditionMap.put("rlike:name", "小王");
         conditionMap.put("in:rid", "2,5,7,9");
         String conditionSQL = "select * from tab_product" + SQLUtil.createConditionSQL(conditionMap);
         Object[] conditionValues = SQLUtil.createConditionValues(conditionMap);
