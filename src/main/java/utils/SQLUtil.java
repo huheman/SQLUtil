@@ -28,38 +28,13 @@ public final class SQLUtil {
     private static final List<String> ORDERS = List.of(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
             GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, ORDER, LIMIT, OFFSET);
     private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET); // 可以冒号后面不接其他的命令
-    // 命令的排序方式
-    private static Comparator<String> sqlComparator = (o1, o2) -> {
-        if (o1.contains(KEY_SEPARTOR) && o2.contains(KEY_SEPARTOR)) {
-            String sub_1 = o1.substring(0, o1.indexOf(KEY_SEPARTOR));
-            String sub_2 = o2.substring(0, o2.indexOf(KEY_SEPARTOR));
-            int i1 = -1;
-            int i2 = -1;
-            for (int i = 0; i < ORDERS.size(); i++) {
-                if (sub_1.matches(ORDERS.get(i))) i1 = i;
-                if (sub_2.matches(ORDERS.get(i))) i2 = i;
-            }
-            if (i1 == i2) return o1.compareTo(o2);
-            return i1 - i2;
-        }
-        return 1;
-    };
+
 
     /**
      * 返回一个用户装条件参数的MAP，必须用这个Map来装各种参数
      */
-    public static TreeMap<String, Object> createConditionMap() {
-
-        return new TreeMap<>(sqlComparator) {
-            @Override
-            public Object put(String key, Object value) {
-                // value既不允许为空，也不允许为空字符串
-                if (value == null || value.equals("")) {
-                    return null;
-                }
-                return super.put(key, value);
-            }
-        };
+    public static ConditionMap createConditionMap() {
+        return new ConditionMap();
     }
 
     /**
@@ -199,15 +174,17 @@ public final class SQLUtil {
     /**
      * 把map中不符合规则的entry去掉，只留下可以写sql的语句
      * 这个方法也能返回一个适用于createConditionSQL的MAP
+     *
+     * 此方法等同于新建一个ConditionMap，把符合规则的entry放进去。
      */
-    public static Map<String, Object> filterConditionOnly(Map<String, String> map) {
+    public static ConditionMap filterConditionOnly(Map<String, String> map) {
         return SQLUtil.filterCondition(map, ORDERS, true);
     }
 
     /**
      * 把condition去掉filter里面有的key,或者选择保留
      */
-    public static Map<String, Object> filterCondition(Map<String, ?> condition, List<String> filter, boolean isKeep) {
+    public static ConditionMap filterCondition(Map<String, ?> condition, List<String> filter, boolean isKeep) {
         return condition.entrySet().stream().filter(entry -> {
             String split = entry.getKey().split(KEY_SEPARTOR)[0];
             for (String s : filter) {
@@ -220,16 +197,20 @@ public final class SQLUtil {
 
     /**
      * 把参数变成适合求count的，把limit，order，offset这些key去掉
+     *
+     * 要求参数是已经被过滤好的
      */
-    public static Map<String, Object> filterConditionForCount(Map<String, Object> orgCondition) {
+    public static ConditionMap filterConditionForCount(ConditionMap orgCondition) {
         List<String> filter = List.of(LIMIT, ORDER, OFFSET);
         return filterCondition(orgCondition, filter, false);
     }
 
     /**
      * 把condition去掉不适合填问号的键
+     *
+     * 要求参数是已经被过滤好的
      */
-    public static Object[] createConditionValues(Map<String, Object> condition) {
+    public static Object[] createConditionValues(ConditionMap condition) {
         List<String> filter = List.of(ORDER, JOIN, ON);
         return filterCondition(condition, filter, false).entrySet().stream()
                 // 先处理LIKE键
@@ -272,7 +253,35 @@ public final class SQLUtil {
                 }).toArray();
     }
 
-    public static class ConditionMAP extends TreeMap<String, Object> {
+    public static class ConditionMap extends TreeMap<String, Object> {
+        // 命令的排序方式
+        private static Comparator<String> sqlComparator = (o1, o2) -> {
+            if (o1.contains(KEY_SEPARTOR) && o2.contains(KEY_SEPARTOR)) {
+                String sub_1 = o1.substring(0, o1.indexOf(KEY_SEPARTOR));
+                String sub_2 = o2.substring(0, o2.indexOf(KEY_SEPARTOR));
+                int i1 = -1;
+                int i2 = -1;
+                for (int i = 0; i < ORDERS.size(); i++) {
+                    if (sub_1.matches(ORDERS.get(i))) i1 = i;
+                    if (sub_2.matches(ORDERS.get(i))) i2 = i;
+                }
+                if (i1 == i2) return o1.compareTo(o2);
+                return i1 - i2;
+            }
+            return 1;
+        };
 
+        private ConditionMap() {
+            super(sqlComparator);
+        }
+
+        @Override
+        public Object put(String key, Object value) {
+            // value既不允许为空，也不允许为空字符串
+            if (value == null || value.equals("")) {
+                return null;
+            }
+            return super.put(key, value);
+        }
     }
 }
