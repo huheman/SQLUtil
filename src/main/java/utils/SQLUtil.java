@@ -177,7 +177,7 @@ public final class SQLUtil {
      *
      * 此方法等同于新建一个ConditionMap，把符合规则的entry放进去。
      */
-    public static ConditionMap makeConditionMap(Map<String, String> map) {
+    public static ConditionMap makeConditionMap(Map<String, ?> map) {
         return SQLUtil.filterCondition(map, ORDERS, true);
     }
 
