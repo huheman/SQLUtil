@@ -74,7 +74,6 @@ public final class SQLUtil {
     private static String createConditionSQL(ConditionMap condition, boolean needWhere) {
         return condition.entrySet().stream().map(new Function<Map.Entry<String, Object>, String>() {
             boolean flag_isFirst = true;
-            boolean flag_needWhere = needWhere;
 
             @Override
             public String apply(Map.Entry<String, Object> entry) {
@@ -121,7 +120,7 @@ public final class SQLUtil {
                     case ORDER:
                         // 处理order by，不用检测是否添加WHERE
                         sb.append(" ORDER BY ").append(eval);
-                        if (split[1].equalsIgnoreCase("DESC"))
+                        if (split.length > 1 && split[1].equalsIgnoreCase("DESC"))
                             sb.append(" DESC");
                         break;
                     case LIMIT:
@@ -147,7 +146,7 @@ public final class SQLUtil {
                         break;
                     case HAVING:
                         // 先保证有GROUP才继续，否则就不管这个了
-                        if (condition.get(GROUP+KEY_SEPARTOR)==null) break;
+                        if (condition.get(GROUP + KEY_SEPARTOR) == null) break;
                         ConditionMap map;
                         try {
                             // 把Having的val转成ConditionMap先
