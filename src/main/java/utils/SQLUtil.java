@@ -146,6 +146,8 @@ public final class SQLUtil {
                         sb.append(" GROUP BY ").append(eval);
                         break;
                     case HAVING:
+                        // 先保证有GROUP才继续，否则就不管这个了
+                        if (condition.get(GROUP+KEY_SEPARTOR)==null) break;
                         ConditionMap map;
                         try {
                             // 把Having的val转成ConditionMap先
