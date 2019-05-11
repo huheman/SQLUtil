@@ -30,7 +30,10 @@ public  class ConditionMap extends TreeMap<String, Object> {
     @Override
     public Object put(String key, Object value) {
         // value既不允许为空，也不允许为空字符串
-        if (value == null || value.equals("")) {
+        if (value == null ) {
+            return null;
+        }
+        if (value instanceof String && value.equals("")) {
             return null;
         }
         return super.put(key, value);

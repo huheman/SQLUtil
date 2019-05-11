@@ -1,6 +1,8 @@
 package utils;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -22,13 +24,15 @@ public final class SQLUtil {
     private static final String ORDER = "order";
     private static final String LIMIT = "limit";
     private static final String OFFSET = "offset";
-
+    private static final String GROUP = "group";
+    private static final String HAVING = "having";
     static final String KEY_SEPARTOR = ":";
 
     static final List<String> ORDERS = List.of(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
-            GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, ORDER, LIMIT, OFFSET);
-    private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET); // 可以冒号后面不接其他的命令
-
+            GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, GROUP, HAVING, ORDER, LIMIT, OFFSET);
+    private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET, GROUP, HAVING); // 可以冒号后面不接其他的命令
+    private static final List<String> UNCOUNTABLE = List.of(LIMIT, ORDER, OFFSET);  // 不能用于select count(*) 语句的条件
+    private static final List<String> COLLAPSE = List.of(ORDER, JOIN, ON, GROUP);  // 不能占位的条件
 
     /**
      * 返回一个用户装条件参数的MAP，必须用这个Map来装各种参数
@@ -40,7 +44,7 @@ public final class SQLUtil {
     /**
      * 因为用NamedTemplate非常严格，要求sql中的别名要完全符合，包括大小写和必须在map中有指定，
      * 所以我们把大小写和在map中没出现的别名，全部替换成null，来解决这个问题
-     *
+     * <p>
      * 此方法适用于insert into。
      */
     public static String formatSQL(String sql, Map<String, String> map) {
@@ -67,9 +71,10 @@ public final class SQLUtil {
     /**
      * 能够把map中符合格式的键值对转化为可用的sql语句
      */
-    public static String createConditionSQL(ConditionMap condition) {
+    private static String createConditionSQL(ConditionMap condition, boolean needWhere) {
         return condition.entrySet().stream().map(new Function<Map.Entry<String, Object>, String>() {
-            boolean needWhere = true;
+            boolean flag_isFirst = true;
+            boolean flag_needWhere = needWhere;
 
             @Override
             public String apply(Map.Entry<String, Object> entry) {
@@ -83,59 +88,70 @@ public final class SQLUtil {
                 switch (split[0]) {
                     case EQUAL:
                         // 如果是精确查找，则只需添加=?即可
-                        needWhere = checkNeedWhere(needWhere, sb);
+                        flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
                         sb.append(split[1]).append("=").append(replaceVal);
                         break;
                     case GREATER_THAN:
                         // 处理大于符号
-                        needWhere = checkNeedWhere(needWhere, sb);
+                        flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
                         sb.append(split[1]).append(">").append(replaceVal);
                         break;
                     case GREATER_EQUAL:
                         // 处理大于等于符号
-                        needWhere = checkNeedWhere(needWhere, sb);
+                        flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
                         sb.append(split[1]).append(">=").append(replaceVal);
                         break;
                     case LESS_THAN:
                         // 处理小于符号
-                        needWhere = checkNeedWhere(needWhere, sb);
+                        flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
                         sb.append(split[1]).append("<").append(replaceVal);
                         break;
                     case LESS_EQUAL:
                         // 处理小于等于符号
-                        needWhere = checkNeedWhere(needWhere, sb);
+                        flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
                         sb.append(split[1]).append("<=").append(replaceVal);
                         break;
                     case LIKE:
                     case RLIKE:
                     case LLIKE:
                         // 处理Like，Like分lLike和rlike。在sql语句是一样的
-                        needWhere = checkNeedWhere(needWhere, sb);
+                        flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
                         sb.append(split[1]).append(" LIKE ").append(replaceVal);
                         break;
                     case ORDER:
                         // 处理order by，不用检测是否添加WHERE
-                        sb.append("ORDER BY ").append(eval);
+                        sb.append(" ORDER BY ").append(eval);
                         if (split[1].equalsIgnoreCase("DESC"))
                             sb.append(" DESC");
                         break;
                     case LIMIT:
                         // limit也是不用检测是否添加where的
-                        sb.append("LIMIT ").append(replaceVal);
+                        sb.append(" LIMIT ").append(replaceVal);
                         break;
                     case OFFSET:
                         // offset 不用检测是否需要添加where
-                        sb.append("OFFSET ").append(replaceVal);
+                        sb.append(" OFFSET ").append(replaceVal);
                         break;
                     case IN:
                         String eValStr = eval.toString();
-                        needWhere = checkNeedWhere(needWhere, sb);
+                        flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
                         sb.append(split[1]).append(" IN (");
                         int varibleCount = (eValStr.split(",").length);
                         for (int i = 0; i < varibleCount; i++) {
                             sb.append("?,");
                         }
                         sb.setCharAt(sb.length() - 1, ')');
+                        break;
+                    case GROUP:
+                        ConditionMap map;
+                        try {
+                            // 把Having的val转成ConditionMap先
+                            map = (ConditionMap) condition.get(HAVING + KEY_SEPARTOR);
+                            sb.append(" GROUP BY ").append(eval)
+                                    .append(" HAVING ").append(createConditionSQL(map, false));
+                        } catch (Exception e) {
+                            break;
+                        }
                         break;
                     default:
                         if (split[0].startsWith("JOIN")) {
@@ -146,7 +162,7 @@ public final class SQLUtil {
                                 if (matcher.find()) {
                                     String field = matcher.group(1);
                                     // 找到就可以添加啦
-                                    sb.append("JOIN ").append(eval).append(" ")
+                                    sb.append(" JOIN ").append(eval).append(" ")
                                             .append(split[1]).append(" ON ").append(valueOfOn)
                                             .append(".").append(field).append("=").append(split[1])
                                             .append(".").append(field);
@@ -162,19 +178,24 @@ public final class SQLUtil {
                 return ONE_PAR.contains(split[0]) || split.length >= 2;
             }
 
-            private boolean checkNeedWhere(boolean needWhere, StringBuilder sb) {
-                if (needWhere) sb.append(" WHERE ");
-                else sb.append("AND ");
+            private boolean checkNeedWhere(boolean isFirst, boolean needWhere, StringBuilder sb) {
+                if (isFirst) {
+                    if (needWhere)
+                        sb.append(" WHERE ");
+                } else sb.append("AND ");
                 return false;
             }
         }).collect(Collectors.joining(" "));
     }
 
+    public static String createConditionSQL(ConditionMap conditionMap) {
+        return createConditionSQL(conditionMap, true);
+    }
 
     /**
      * 把map中不符合规则的entry去掉，只留下可以写sql的语句
      * 这个方法也能返回一个适用于createConditionSQL的MAP
-     *
+     * <p>
      * 此方法等同于新建一个ConditionMap，把符合规则的entry放进去。
      */
     public static ConditionMap makeConditionMap(Map<String, ?> map) {
@@ -197,22 +218,20 @@ public final class SQLUtil {
 
     /**
      * 把参数变成适合求count的，把limit，order，offset这些key去掉
-     *
+     * <p>
      * 要求参数是已经被过滤好的
      */
     public static ConditionMap filterConditionForCount(ConditionMap orgCondition) {
-        List<String> filter = List.of(LIMIT, ORDER, OFFSET);
-        return filterCondition(orgCondition, filter, false);
+        return filterCondition(orgCondition, UNCOUNTABLE, false);
     }
 
     /**
      * 把condition去掉不适合填问号的键
-     *
+     * <p>
      * 要求参数是已经被过滤好的
      */
     public static Object[] createConditionValues(ConditionMap condition) {
-        List<String> filter = List.of(ORDER, JOIN, ON);
-        return filterCondition(condition, filter, false).entrySet().stream()
+        return filterCondition(condition, COLLAPSE, false).entrySet().stream()
                 // 先处理LIKE键
                 .peek(new Consumer<>() {
                     @Override
@@ -246,8 +265,13 @@ public final class SQLUtil {
                 })
                 // 再把IN键的值拆开
                 .flatMap(entry -> {
-                    if (entry.getKey().split(KEY_SEPARTOR)[0].equalsIgnoreCase(IN)) {
+                    String tag = entry.getKey().split(KEY_SEPARTOR)[0];
+                    if (tag.equalsIgnoreCase(IN)) {
                         return Arrays.stream(entry.getValue().toString().split(","));
+                    }
+                    // 把HAVING的值拆开
+                    if (tag.equalsIgnoreCase(HAVING)) {
+                        return Arrays.stream(createConditionValues((ConditionMap) entry.getValue()));
                     }
                     return List.of(entry.getValue()).stream();
                 }).toArray();

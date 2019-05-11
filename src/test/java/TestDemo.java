@@ -16,6 +16,10 @@ public class TestDemo {
         conditionMap.put("offset:", 10);
         conditionMap.put("rlike:name", "小王");
         conditionMap.put("in:rid", "2,5,7,9");
+        ConditionMap havingMap = SQLUtil.createConditionMap();
+        havingMap.put("ge:date", "1990-09-20");
+        conditionMap.put("having:", havingMap);
+        conditionMap.put("group:", "cid");
         String conditionSQL = "select * from tab_product" + SQLUtil.createConditionSQL(conditionMap);
         Object[] conditionValues = SQLUtil.createConditionValues(conditionMap);
         System.out.println("conditionSQL = " + conditionSQL);
