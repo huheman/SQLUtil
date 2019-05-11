@@ -27,7 +27,8 @@ public final class SQLUtil {
 
     private static final List<String> ORDERS = List.of(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
             GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, ORDER, LIMIT, OFFSET);
-    private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET);
+    private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET); // 可以冒号后面不接其他的命令
+    // 命令的排序方式
     private static Comparator<String> sqlComparator = (o1, o2) -> {
         if (o1.contains(KEY_SEPARTOR) && o2.contains(KEY_SEPARTOR)) {
             String sub_1 = o1.substring(0, o1.indexOf(KEY_SEPARTOR));
@@ -44,6 +45,9 @@ public final class SQLUtil {
         return 1;
     };
 
+    /**
+     * 返回一个用户装条件参数的MAP，必须用这个Map来装各种参数
+     */
     public static TreeMap<String, Object> createConditionMap() {
 
         return new TreeMap<>(sqlComparator) {
@@ -61,7 +65,8 @@ public final class SQLUtil {
     /**
      * 因为用NamedTemplate非常严格，要求sql中的别名要完全符合，包括大小写和必须在map中有指定，
      * 所以我们把大小写和在map中没出现的别名，全部替换成null，来解决这个问题
-     * 此方法适合insert into。
+     *
+     * 此方法适用于insert into。
      */
     public static String formatSQL(String sql, Map<String, String> map) {
         Pattern pattern = Pattern.compile(":(\\w+)[,)]");
@@ -193,6 +198,7 @@ public final class SQLUtil {
 
     /**
      * 把map中不符合规则的entry去掉，只留下可以写sql的语句
+     * 这个方法也能返回一个适用于createConditionSQL的MAP
      */
     public static Map<String, Object> filterConditionOnly(Map<String, String> map) {
         return SQLUtil.filterCondition(map, ORDERS, true);
@@ -264,5 +270,9 @@ public final class SQLUtil {
                     }
                     return List.of(entry.getValue()).stream();
                 }).toArray();
+    }
+
+    public static class ConditionMAP extends TreeMap<String, Object> {
+
     }
 }
