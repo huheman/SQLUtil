@@ -143,12 +143,14 @@ public final class SQLUtil {
                         sb.setCharAt(sb.length() - 1, ')');
                         break;
                     case GROUP:
+                        sb.append(" GROUP BY ").append(eval);
+                        break;
+                    case HAVING:
                         ConditionMap map;
                         try {
                             // 把Having的val转成ConditionMap先
                             map = (ConditionMap) condition.get(HAVING + KEY_SEPARTOR);
-                            sb.append(" GROUP BY ").append(eval)
-                                    .append(" HAVING ").append(createConditionSQL(map, false));
+                            sb.append(" HAVING ").append(createConditionSQL(map, false));
                         } catch (Exception e) {
                             break;
                         }
