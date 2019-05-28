@@ -177,10 +177,6 @@ public final class SQLUtil {
                 return sb.toString();
             }
 
-            private boolean enSureKey(String[] split) {
-                return ONE_PAR.contains(split[0]) || split.length >= 2;
-            }
-
             private boolean checkNeedWhere(boolean isFirst, boolean needWhere, StringBuilder sb) {
                 if (isFirst) {
                     if (needWhere)
@@ -189,6 +185,10 @@ public final class SQLUtil {
                 return false;
             }
         }).collect(Collectors.joining(" "));
+    }
+
+    private static boolean enSureKey(String[] split) {
+        return ONE_PAR.contains(split[0]) || split.length >= 2;
     }
 
     public static String createConditionSQL(ConditionMap conditionMap) {
@@ -230,8 +230,6 @@ public final class SQLUtil {
 
     /**
      * 把condition去掉不适合填问号的键
-     * <p>
-     * 要求参数是已经被过滤好的
      */
     public static Object[] createConditionValues(ConditionMap condition) {
         return filterCondition(condition, COLLAPSE, false).entrySet().stream()
@@ -280,5 +278,87 @@ public final class SQLUtil {
                 }).toArray();
     }
 
+    /**
+     * 通过ConditionMap生成一个mybatis适用的sql语句
+     */
+    /*public static String createBatisStyleSQL(SQL sql, ConditionMap conditionMap) {
+        boolean hasLimit = false;
+        boolean hasOffset = false;
+        conditionMap.entrySet().forEach((entry) -> {
+            String[] split = entry.getKey().split(KEY_SEPARTOR);
+            String tag = split[0];
+            // 核实该有两个值的要有两个值
+            if (!enSureKey(split)) return;
+            String replaceVal;
 
+            // 确定替换的值
+            if (COLLAPSE.contains(tag)) {
+                replaceVal = "${" + entry.getKey() + "}";
+            } else {
+                replaceVal = "#{" + entry.getKey() + "}";
+            }
+            // 因为JOIN ON涉及myBatis中的不同resultMap，所以这个框架不考虑JOIN ON。
+            switch (tag) {
+                case EQUAL:
+                    sql.WHERE(split[1] + "=" + replaceVal);
+                    break;
+                case GREATER_THAN:
+                    sql.WHERE(split[1] + ">" + replaceVal);
+                    break;
+                case LESS_THAN:
+                    sql.WHERE(split[1] + "<" + replaceVal);
+                    break;
+                case GREATER_EQUAL:
+                    sql.WHERE(split[1] + ">=" + replaceVal);
+                    break;
+                case LESS_EQUAL:
+                    sql.WHERE(split[1] + "<=" + replaceVal);
+                    break;
+                case RLIKE:
+                    entry.setValue(entry.getValue() + "%");
+                    sql.WHERE(split[1] + " LIKE " + replaceVal);
+                    break;
+                case LLIKE:
+                    entry.setValue("%" + entry.getValue());
+                    sql.WHERE(split[1] + " LIKE " + replaceVal);
+                    break;
+                case LIKE:
+                    entry.setValue("%" + entry.getValue() + "%");
+                    sql.WHERE(split[1] + " LIKE " + replaceVal);
+                    break;
+                case IN:
+                    // 为了防止注入，应该把In的值变成一个Map
+                    Map<String, String> map = Arrays.stream(((String) entry.getValue())
+                            .split(","))
+                            .collect(Collectors.toMap(s -> s, s -> s));
+                    entry.setValue(map);
+                    replaceVal = map.keySet().stream().map(s -> "#{" + entry.getKey() + "." + s + "}")
+                            .collect(Collectors.joining(",", "(", ")"));
+                    sql.WHERE(split[1] + " IN " + replaceVal);
+                    break;
+                case GROUP:
+                    sql.GROUP_BY(replaceVal);
+                    break;
+                case HAVING:
+
+                    break;
+                case ORDER:
+                    if (split.length > 1 && split[1].equalsIgnoreCase("DESC"))
+                        sql.ORDER_BY(replaceVal + " DESC");
+                    else
+                        sql.ORDER_BY(replaceVal);
+                    break;
+                default:
+                    break;
+            }
+        });
+        String sqlRet = sql.toString();
+        if (conditionMap.get("limit:") != null) {
+            sqlRet += "limit #{limit:}";
+        }
+        if (conditionMap.get("offset:") != null) {
+            sqlRet += "offset #{offset:}";
+        }
+        return sqlRet;
+    }*/
 }

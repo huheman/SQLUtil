@@ -31,4 +31,14 @@ public class TestDemo {
         System.out.println("countValues = " + Arrays.toString(countValues));
         System.out.println(System.currentTimeMillis()-l);
     }
+
+    @Test
+    public void testBatisSQL() {
+        /*SQL sql = new SQL().SELECT("*").FROM("tab_route");
+        ConditionMap conditionMap = SQLUtil.createConditionMap();
+        conditionMap.put(":id", 2);
+        conditionMap.put(":cid", 4);
+        conditionMap.put("in:rid", "4,8,9,10");
+        System.out.println("finalResult = " + finalResult);*/
+    }
 }
