@@ -8,6 +8,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class SQLUtil {
     private static final String JOIN = "join\\w*";
@@ -28,11 +29,14 @@ public final class SQLUtil {
     private static final String HAVING = "having";
     static final String KEY_SEPARTOR = ":";
 
-    static final List<String> ORDERS = List.of(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
+    static final List<String> ORDERS = Arrays.asList(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
             GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, GROUP, HAVING, ORDER, LIMIT, OFFSET);
-    private static final List<String> ONE_PAR = List.of(ORDER, LIMIT, OFFSET, GROUP, HAVING); // 可以冒号后面不接其他的命令
-    private static final List<String> UNCOUNTABLE = List.of(LIMIT, ORDER, OFFSET);  // 不能用于select count(*) 语句的条件
-    private static final List<String> COLLAPSE = List.of(ORDER, JOIN, ON, GROUP);  // 不能占位的条件
+    private static final List<String> ONE_PAR = Arrays.asList(ORDER, LIMIT, OFFSET, GROUP, HAVING); // 可以冒号后面不接其他的命令
+    private static final List<String> UNCOUNTABLE = Arrays.asList(LIMIT, ORDER, OFFSET);  // 不能用于select count(*) 语句的条件
+    private static final List<String> COLLAPSE = Arrays.asList(ORDER, JOIN, ON, GROUP);  // 不能占位的条件
+
+    private static final String MARK_QUESTION = "question";  // 用问号填充sql语句
+    private static final String MARK_KEY = "key";  // 用#{key}填充sql语句
 
     /**
      * 返回一个用户装条件参数的MAP，必须用这个Map来装各种参数
@@ -47,7 +51,7 @@ public final class SQLUtil {
      * <p>
      * 此方法适用于insert into。
      */
-    public static String formatSQL(String sql, Map<String, String> map) {
+    /*public static String formatSQL(String sql, Map<String, String> map) {
         Pattern pattern = Pattern.compile(":(\\w+)[,)]");
         Matcher matcher = pattern.matcher(sql);
         boolean result = matcher.find();
@@ -66,12 +70,12 @@ public final class SQLUtil {
             return sb.toString();
         }
         return sql;
-    }
+    }*/
 
     /**
      * 能够把map中符合格式的键值对转化为可用的sql语句
      */
-    private static String createConditionSQL(ConditionMap condition, boolean needWhere) {
+    private static String createConditionSQL(ConditionMap condition, boolean needWhere, String replacementMark) {
         return condition.entrySet().stream().map(new Function<Map.Entry<String, Object>, String>() {
             boolean flag_isFirst = true;
 
@@ -82,7 +86,19 @@ public final class SQLUtil {
                 String[] split = entry.getKey().split(KEY_SEPARTOR);
                 // 核实该有两个值的要有两个值
                 if (!enSureKey(split)) return "";
-                String replaceVal = "?";
+
+                // 核实用那种类型作为占位符
+                String replaceVal;
+                switch (replacementMark) {
+                    case MARK_QUESTION:
+                        replaceVal = "?";
+                        break;
+                    case MARK_KEY:
+                        replaceVal = "#{" + entry.getKey() + "}";
+                        break;
+                    default:
+                        throw new RuntimeException("要求replaceVal为question或key之一");
+                }
                 Object eval = entry.getValue();
                 switch (split[0]) {
                     case EQUAL:
@@ -132,12 +148,15 @@ public final class SQLUtil {
                         sb.append(" OFFSET ").append(replaceVal);
                         break;
                     case IN:
-                        String eValStr = eval.toString();
                         flag_isFirst = checkNeedWhere(flag_isFirst, needWhere, sb);
+                        String[] eValStrs = makeListToArray(eval);
                         sb.append(split[1]).append(" IN (");
-                        int varibleCount = (eValStr.split(",").length);
+                        int varibleCount = eValStrs.length;
                         for (int i = 0; i < varibleCount; i++) {
-                            sb.append("?,");
+                            if (replacementMark.equalsIgnoreCase(MARK_KEY)) {
+                                replaceVal = "#{" + entry.getKey() + "[" + i + "]}";
+                            }
+                            sb.append(replaceVal).append(",");
                         }
                         sb.setCharAt(sb.length() - 1, ')');
                         break;
@@ -151,7 +170,7 @@ public final class SQLUtil {
                         try {
                             // 把Having的val转成ConditionMap先
                             map = (ConditionMap) condition.get(HAVING + KEY_SEPARTOR);
-                            sb.append(" HAVING ").append(createConditionSQL(map, false));
+                            sb.append(" HAVING ").append(createConditionSQL(map, false, replacementMark));
                         } catch (Exception e) {
                             break;
                         }
@@ -187,12 +206,22 @@ public final class SQLUtil {
         }).collect(Collectors.joining(" "));
     }
 
+    private static String[] makeListToArray(Object eval) {
+        String[] eValStrs;
+        if (eval instanceof List) {
+            eValStrs = (String[]) ((List) eval).toArray(new String[0]);
+        } else {
+            eValStrs = (String[]) eval;
+        }
+        return eValStrs;
+    }
+
     private static boolean enSureKey(String[] split) {
         return ONE_PAR.contains(split[0]) || split.length >= 2;
     }
 
     public static String createConditionSQL(ConditionMap conditionMap) {
-        return createConditionSQL(conditionMap, true);
+        return createConditionSQL(conditionMap, true, MARK_QUESTION);
     }
 
     /**
@@ -229,12 +258,12 @@ public final class SQLUtil {
     }
 
     /**
-     * 把condition去掉不适合填问号的键
+     * 把condition去掉不适合填问号的键，再把值变成适合jdbcTemplate的值
      */
     public static Object[] createConditionValues(ConditionMap condition) {
         return filterCondition(condition, COLLAPSE, false).entrySet().stream()
                 // 先处理LIKE键
-                .peek(new Consumer<>() {
+                .peek(new Consumer<Map.Entry<String, Object>>() {
                     @Override
                     public void accept(Map.Entry<String, Object> entry) {
                         String val = entry.getValue().toString();
@@ -268,19 +297,24 @@ public final class SQLUtil {
                 .flatMap(entry -> {
                     String tag = entry.getKey().split(KEY_SEPARTOR)[0];
                     if (tag.equalsIgnoreCase(IN)) {
-                        return Arrays.stream(entry.getValue().toString().split(","));
+                        return Arrays.stream(makeListToArray(entry.getValue()));
                     }
                     // 把HAVING的值拆开
                     if (tag.equalsIgnoreCase(HAVING)) {
                         return Arrays.stream(createConditionValues((ConditionMap) entry.getValue()));
                     }
-                    return List.of(entry.getValue()).stream();
+                    return Stream.of(entry.getValue());
                 }).toArray();
     }
 
     /**
      * 通过ConditionMap生成一个mybatis适用的sql语句
      */
+    public static String createBatisStyleSQL(ConditionMap conditionMap) {
+        return createConditionSQL(conditionMap, true, MARK_KEY);
+    }
+
+
     /*public static String createBatisStyleSQL(SQL sql, ConditionMap conditionMap) {
         boolean hasLimit = false;
         boolean hasOffset = false;
