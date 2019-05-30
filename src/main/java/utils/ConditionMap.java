@@ -20,7 +20,7 @@ public  class ConditionMap extends TreeMap<String, Object> {
             if (i1 == i2) return o1.compareTo(o2);
             return i1 - i2;
         }
-        return 1;
+        return o1.compareTo(o2);
     };
 
     ConditionMap() {

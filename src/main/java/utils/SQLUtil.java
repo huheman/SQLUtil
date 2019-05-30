@@ -27,7 +27,7 @@ public final class SQLUtil {
     private static final String OFFSET = "offset";
     private static final String GROUP = "group";
     private static final String HAVING = "having";
-    static final String KEY_SEPARTOR = ":";
+    public static final String KEY_SEPARTOR = "$";
 
     static final List<String> ORDERS = Arrays.asList(JOIN, ON, EQUAL, GREATER_THAN, LESS_THAN,
             GREATER_EQUAL, LESS_EQUAL, RLIKE, LLIKE, LIKE, IN, GROUP, HAVING, ORDER, LIMIT, OFFSET);

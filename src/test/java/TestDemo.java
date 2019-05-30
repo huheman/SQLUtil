@@ -34,7 +34,7 @@ public class TestDemo {
 
     @Test
     public void testBatisSQL() {
-        ConditionMap conditionMap = SQLUtil.createConditionMap();
+        /*ConditionMap conditionMap = SQLUtil.createConditionMap();
         conditionMap.put(":id", 2);
         conditionMap.put(":cid", 4);
         conditionMap.put("order:desc", "id");
@@ -46,6 +46,6 @@ public class TestDemo {
         Object[] conditionValues = SQLUtil.createConditionValues(conditionMap);
         System.out.println("finalResult : " + finalResult);
         System.out.println("conditionSQL = " + conditionSQL);
-        System.out.println("Arrays.toString(conditionValues) = " + Arrays.toString(conditionValues));
+        System.out.println("Arrays.toString(conditionValues) = " + Arrays.toString(conditionValues));*/
     }
 }
